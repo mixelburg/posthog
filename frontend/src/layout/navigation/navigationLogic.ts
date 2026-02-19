@@ -1,5 +1,6 @@
 import { actions, connect, kea, listeners, path, reducers, selectors } from 'kea'
 import { loaders } from 'kea-loaders'
+import { subscriptions } from 'kea-subscriptions'
 import { windowValues } from 'kea-window-values'
 
 import api from 'lib/api'
@@ -27,7 +28,7 @@ export const navigationLogic = kea<navigationLogicType>([
     path(['layout', 'navigation', 'navigationLogic']),
     connect(() => ({
         values: [sceneLogic, ['sceneConfig'], membersLogic, ['memberCount']],
-        actions: [eventUsageLogic, ['reportProjectNoticeDismissed']],
+        actions: [eventUsageLogic, ['reportProjectNoticeDismissed'], teamLogic, ['loadCurrentTeam']],
     })),
     actions({
         closeProjectNotice: (projectNoticeVariant: ProjectNoticeVariant) => ({ projectNoticeVariant }),
@@ -127,6 +128,20 @@ export const navigationLogic = kea<navigationLogicType>([
     listeners(({ actions }) => ({
         closeProjectNotice: ({ projectNoticeVariant }) => {
             actions.reportProjectNoticeDismissed(projectNoticeVariant)
+        },
+    })),
+    subscriptions(({ actions, cache }) => ({
+        projectNoticeVariant: (variant: ProjectNoticeVariant | null) => {
+            if (variant === 'real_project_with_no_events') {
+                cache.disposables.add(() => {
+                    const timerId = window.setInterval(() => {
+                        actions.loadCurrentTeam()
+                    }, 60_000)
+                    return () => clearInterval(timerId)
+                }, 'noEventsPolling')
+            } else {
+                cache.disposables.dispose('noEventsPolling')
+            }
         },
     })),
 ])
